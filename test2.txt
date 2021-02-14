@@ -1,5 +1,126 @@
-test2
+package org.seaman.seaman_app.dao.impl;
 
-dev s2server2
+import java.util.List;
 
-main
+import javax.persistence.EntityManager;
+import javax.persistence.PersistenceContext;
+import javax.persistence.Query;
+import javax.transaction.Transactional;
+
+import org.seaman.seaman_app.dao.SeamanDao;
+import org.seaman.seaman_app.dto.SeamanSearchDto;
+import org.seaman.seaman_app.model.Seaman;
+
+@Transactional
+public class SeamanDaoImpl implements SeamanDao {
+
+	@PersistenceContext
+	EntityManager entityManager;
+
+	@SuppressWarnings("unchecked")
+	@Override
+	public List<Seaman> searchSeaman(SeamanSearchDto searchDto) {
+
+		StringBuilder mainQuery = new StringBuilder("SELECT s.* FROM seaman s");
+		StringBuilder whereClause = new StringBuilder(" WHERE s.id=s.id ");
+		StringBuilder orderBy = new StringBuilder(" ORDER BY ");
+
+		if (searchDto.getSortKey() != null && !searchDto.getSortKey().isEmpty()) {
+			if (searchDto.getSortKey().equals("sortAge")) {
+				orderBy.append(" s.date_of_birth " + searchDto.getSortValue());
+			} else if (searchDto.getSortKey().equals("sortWage")) {
+				orderBy.append(" s.expected_wages_id " + searchDto.getSortValue());
+			} else {
+				orderBy.append("s.id");
+			}
+		} else {
+			orderBy.append("s.id");
+		}
+
+		if (searchDto.isAvailableNow()) {
+			whereClause.append(
+					" AND s.id not in (select seaman_id from experience where CURDATE() between sign_on and sign_off)");
+		}
+
+		if (searchDto.getCertificate() != null && searchDto.getCertificate() != -1) {
+			whereClause.append(
+					" AND s.id in (select seaman_id from certificate where certificate_type_id=:certificateId and (expired_date IS NULL OR CURDATE()<=expired_date))");
+		}
+
+		if (searchDto.getCdcNo() != null && !searchDto.getCdcNo().isEmpty()) {
+			whereClause.append(" AND s.cdc_number = :cdcNumber");
+		}
+
+		if (searchDto.getRank() != null && !"-1".equals(searchDto.getRank())) {
+			whereClause.append(" AND s.rank_id = :rank");
+		}
+
+		if (searchDto.getExpShip() != -1) {
+			whereClause.append(" AND s.expected_ship_id = :ship");
+		}
+
+		if (searchDto.getEnglishSkill() != null && !"-1".equals(searchDto.getEnglishSkill())) {
+			whereClause.append(" AND s.english_skill = :englishSkill");
+		}
+
+		if (searchDto.getComputerSkill() != null && !"-1".equals(searchDto.getComputerSkill())) {
+			whereClause.append(" AND s.computer_skill = :computerSkill");
+		}
+
+		if (searchDto.getMaxExpWage() != 0) {
+			mainQuery.append(" INNER JOIN expected_wages ew ON s.expected_wages_id = ew.id ");
+			whereClause.append(" AND (ew.min_val = :wages or ew.max_val <= :wages)");
+		}
+
+		if (searchDto.getMinAge() != 0) {
+			whereClause.append(" AND (YEAR(CURDATE())-YEAR(s.date_of_birth)) >= :minAge");
+		}
+
+		if (searchDto.getMaxAge() != 0) {
+			whereClause.append(" AND (YEAR(CURDATE())-YEAR(s.date_of_birth)) <= :maxAge");
+		}
+
+		Query query = entityManager.createNativeQuery(mainQuery.append(
+				whereClause.length() > 10 ? whereClause.append(orderBy.toString()).toString() : orderBy.toString())
+				.toString(), Seaman.class);
+
+		if (searchDto.getCertificate() != null && searchDto.getCertificate() != -1) {
+			query.setParameter("certificateId", searchDto.getCertificate());
+		}
+
+		if (searchDto.getRank() != null && !"-1".equals(searchDto.getRank())) {
+			query.setParameter("rank", searchDto.getRank());
+		}
+
+		if (searchDto.getExpShip() != -1) {
+			query.setParameter("ship", searchDto.getExpShip());
+		}
+
+		if (searchDto.getMaxExpWage() != 0) {
+			query.setParameter("wages", searchDto.getMaxExpWage());
+		}
+
+		if (searchDto.getMinAge() != 0) {
+			query.setParameter("minAge", searchDto.getMinAge());
+		}
+
+		if (searchDto.getMaxAge() != 0) {
+			query.setParameter("maxAge", searchDto.getMaxAge());
+		}
+
+		if (searchDto.getCdcNo() != null && !searchDto.getCdcNo().isEmpty()) {
+			query.setParameter("cdcNumber", searchDto.getCdcNo());
+		}
+
+		if (searchDto.getEnglishSkill() != null && !"-1".equals(searchDto.getEnglishSkill())) {
+			query.setParameter("englishSkill", searchDto.getEnglishSkill());
+		}
+
+		if (searchDto.getComputerSkill() != null && !"-1".equals(searchDto.getComputerSkill())) {
+			query.setParameter("computerSkill", searchDto.getComputerSkill());
+		}
+
+		return query.getResultList();
+	}
+
+}
