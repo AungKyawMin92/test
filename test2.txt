@@ -1,5 +1,0 @@
-Stach
-
-dev s2server2
-
-main
